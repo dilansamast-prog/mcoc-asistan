@@ -126,7 +126,12 @@ with tab1:
                 st.markdown(f"**🚫 Yasaklar:** :red[{rakip_data.get('Kritik Uyarı (Yasaklar)', '-')}]")
             with col2:
                 st.markdown(f"**🎯 Bait:** {rakip_data.get('SP Tercihi (Bait)', '-')}")
+            
             st.info(f"**🥊 Taktik:**\n{rakip_data.get('Nasıl Dövülür (Taktik)', '-')}")
+            
+            # --- YENİ EKLENEN KISIM ---
+            st.success(f"**🛡️ En İyi 5 Anti (Genel Öneri):**\n{rakip_data.get('En İyi 5 Anti (Counter)', '-')}")
+            # --------------------------
 
         st.divider()
         st.subheader("✅ Senin Kadron İçin Öneriler")
@@ -173,7 +178,6 @@ with tab1:
 
             if not uygun_adaylar:
                 st.warning("Kadronuzda uygun counter yok.")
-                st.markdown(f"**Genel Öneriler:** {antiler_text}")
             else:
                 for i, aday in enumerate(uygun_adaylar):
                     st.success(f"**{i+1}. {aday['isim']}** ({aday['detay']}) - Puan: {aday['puan']}")
@@ -206,9 +210,6 @@ with tab2:
                 kadroyu_cereze_kaydet()
                 
                 st.toast(f"{yeni_isim} kaydedildi!", icon="✅")
-                # Çerezin işlemesi için sayfayı yenilemek gerekebilir
-                # st.rerun() komutu bazen çerez yazılmadan çalışırsa sorun olabilir, 
-                # ama genelde Streamlit bunu halleder.
         else:
             st.toast("İsim seçmediniz.", icon="❌")
 
