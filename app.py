@@ -4,9 +4,10 @@ import extra_streamlit_components as stx
 import json
 import os
 import datetime
+import time
 
 # --- AYARLAR ---
-EXCEL_DOSYASI = "marvel_data.xlsx" # Dosya adının GitHub'dakiyle aynı olduğundan emin ol
+EXCEL_DOSYASI = "marvel_data.xlsx"
 SAYFA_ANA = "Marvel 2026"
 SAYFA_TAKTIK = "nasıl dövüşülür"
 
@@ -48,7 +49,6 @@ def excel_yukle():
         for _, row in df_main.iterrows():
             isim = str(row['İsim']).strip()
             db[isim] = row.to_dict()
-            # Varsayılanlar
             for key in ['SP Tercihi (Bait)', 'Kritik Uyarı (Yasaklar)', 'Nasıl Dövülür (Taktik)']:
                 db[isim][key] = "-"
 
@@ -59,37 +59,46 @@ def excel_yukle():
                     db[isim].update({
                         'SP Tercihi (Bait)': row.get('SP Tercihi (Bait)', '-'),
                         'Kritik Uyarı (Yasaklar)': row.get('Kritik Uyarı (Yasaklar)', '-'),
-                        'Nasıl Dövülür (Taktik)': row.get('Nasıl Dövülür (Taktik)', '-')
+                        'Nasıl Dövülür (Taktik)': row.get('Nasıl Dövülür (Taktik)', '-'),
+                        'En İyi 5 Anti (Counter)': row.get('En İyi 5 Anti (Counter)', '-') # Taktik sayfasında da olabilir
                     })
+                    # Ana sayfadaki anti bilgisini önceliklendir (eğer varsa)
+                    if 'En İyi 5 Anti (Counter)' in row and pd.notna(row['En İyi 5 Anti (Counter)']):
+                         db[isim]['En İyi 5 Anti (Counter)'] = row['En İyi 5 Anti (Counter)']
+
         return db
     except Exception as e:
         st.error(f"Excel Hatası: {e}")
         return None
 
-# --- ÇEREZ YÖNETİCİSİ AYARLARI ---
+# --- ÇEREZ YÖNETİCİSİ (KEY EKLEMEK ÖNEMLİ) ---
 def get_manager():
-    return stx.CookieManager()
+    return stx.CookieManager(key="mcoc_manager")
 
 cookie_manager = get_manager()
 
-# --- ARAYÜZ ---
+# --- ARAYÜZ BAŞLANGICI ---
 
 st.title("⚔️ MCoC Savaş Asistanı")
 
-# Çerezleri Oku
-cookies = cookie_manager.get_all()
-kadro_cookie = cookies.get("my_mcoc_squad")
-
-# Session State Başlatma (Çerez varsa oradan al, yoksa boş liste)
+# --- SENKRONİZASYON MANTIĞI (DÜZELTİLEN KISIM) ---
+# 1. Session State'i başlat
 if 'kadro' not in st.session_state:
-    if kadro_cookie:
+    st.session_state['kadro'] = []
+
+# 2. Çerezleri Oku
+cookies = cookie_manager.get_all()
+
+# 3. Eğer Session boşsa AMA Çerez doluysa -> Çerezi yükle (Sayfa yenileme koruması)
+# Bu blok her çalıştırmada kontrol edilir, böylece çerez geç yüklense bile yakalar.
+if not st.session_state['kadro'] and cookies:
+    raw_cookie = cookies.get("my_mcoc_squad")
+    if raw_cookie:
         try:
-            # Çerezler string (yazı) olarak saklanır, onu listeye çeviriyoruz
-            st.session_state['kadro'] = json.loads(kadro_cookie)
+            st.session_state['kadro'] = json.loads(raw_cookie)
+            # Yükleme olduğunu kullanıcıya hissettirmemek için sessizce yapıyoruz
         except:
-            st.session_state['kadro'] = []
-    else:
-        st.session_state['kadro'] = []
+            pass
 
 # Excel Verisini Çek
 db = excel_yukle()
@@ -101,9 +110,7 @@ tum_isimler = sorted(list(db.keys()))
 
 # --- ÇEREZ KAYDETME FONKSİYONU ---
 def kadroyu_cereze_kaydet():
-    # Listeyi yazıya (JSON String) çevir
     kadro_str = json.dumps(st.session_state['kadro'], ensure_ascii=False)
-    # Çerezi güncelle (Süre: 30 Gün)
     expires = datetime.datetime.now() + datetime.timedelta(days=30)
     cookie_manager.set("my_mcoc_squad", kadro_str, expires_at=expires)
 
@@ -128,10 +135,7 @@ with tab1:
                 st.markdown(f"**🎯 Bait:** {rakip_data.get('SP Tercihi (Bait)', '-')}")
             
             st.info(f"**🥊 Taktik:**\n{rakip_data.get('Nasıl Dövülür (Taktik)', '-')}")
-            
-            # --- YENİ EKLENEN KISIM ---
             st.success(f"**🛡️ En İyi 5 Anti (Genel Öneri):**\n{rakip_data.get('En İyi 5 Anti (Counter)', '-')}")
-            # --------------------------
 
         st.divider()
         st.subheader("✅ Senin Kadron İçin Öneriler")
@@ -148,7 +152,6 @@ with tab1:
                 h_isim = hero['isim']
                 h_sinif = hero['sinif']
                 
-                # Puanlama
                 if h_isim in antiler_text:
                     puan += 50
                     nedenler.append("⭐ TAM ANTİ")
@@ -186,7 +189,7 @@ with tab1:
 # --- TAB 2: KADRO YÖNETİMİ ---
 with tab2:
     st.header("Kadro Düzenle (Kişisel Kayıt)")
-    st.caption("⚠️ Veriler tarayıcınızın çerezlerinde 30 gün saklanır. Tarayıcı geçmişini silerseniz kaybolur.")
+    st.caption("Veriler tarayıcınızda saklanır. Sayfayı yenileseniz de silinmez.")
     
     col_k1, col_k2, col_k3 = st.columns(3)
     with col_k1:
@@ -206,10 +209,11 @@ with tab2:
                 yeni_kayit = {"isim": yeni_isim, "yildiz": yeni_yildiz, "rank": yeni_rank, "sinif": sinif}
                 st.session_state['kadro'].append(yeni_kayit)
                 
-                # Çereze Kaydet
+                # Çereze Kaydet ve Hafif Bekle
                 kadroyu_cereze_kaydet()
-                
-                st.toast(f"{yeni_isim} kaydedildi!", icon="✅")
+                st.toast(f"{yeni_isim} eklendi! Kaydediliyor...", icon="✅")
+                time.sleep(0.5) # Çerezin yazılması için minik bir bekleme
+                st.rerun()
         else:
             st.toast("İsim seçmediniz.", icon="❌")
 
@@ -231,9 +235,14 @@ with tab2:
             st.session_state['kadro'] = [k for k in st.session_state['kadro'] 
                                          if not (k['isim'] == isim_sil and k['yildiz'] == yildiz_sil)]
             
-            # Güncel halini kaydet
             kadroyu_cereze_kaydet()
-            st.success("Silindi! Sayfa yenileniyor...")
+            st.success("Silindi!")
+            time.sleep(0.5)
             st.rerun()
+            
+        # Manuel Yükleme Butonu (Acil durumlar için)
+        if st.button("🔄 Kadro Görünmüyorsa Tıkla (Yenile)"):
+             # Çerezden zorla okumayı tetiklemek için sayfayı yeniler
+             st.rerun()
     else:
-        st.info("Kadro boş.")
+        st.info("Kadro boş veya yükleniyor...")
