@@ -1,0 +1,38 @@
+[
+    {
+        "isim": "Silk",
+        "yildiz": "7 Yıldız",
+        "rank": "R2",
+        "sinif": "Bilim"
+    },
+    {
+        "isim": "Alev Adam (Alev Adam)",
+        "yildiz": "5 Yıldız",
+        "rank": "R5",
+        "sinif": "Bilim"
+    },
+    {
+        "isim": "Dust",
+        "yildiz": "6 Yıldız",
+        "rank": "R2",
+        "sinif": "Mutant"
+    },
+    {
+        "isim": "Hulk (OG)",
+        "yildiz": "6 Yıldız",
+        "rank": "R4",
+        "sinif": "Bilim"
+    },
+    {
+        "isim": "Demir Adam (Rezil/Infamous)",
+        "yildiz": "6 Yıldız",
+        "rank": "R2",
+        "sinif": "Teknoloji"
+    },
+    {
+        "isim": "Kara Dul (Deadly Origin)",
+        "yildiz": "6 Yıldız",
+        "rank": "R3",
+        "sinif": "Beceri"
+    }
+]
