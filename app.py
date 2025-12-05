@@ -4,7 +4,7 @@ import json
 import os
 
 # --- AYARLAR ---
-EXCEL_DOSYASI = "MARVEL 2026 TÜM LİSTE.XLSX"
+EXCEL_DOSYASI = "marvel_data.xlsx"  # Yeni, basit isim
 SAYFA_ANA = "Marvel 2026"
 SAYFA_TAKTIK = "nasıl dövüşülür"
 KADRO_DOSYASI = "kadrom.json"
@@ -226,4 +226,5 @@ with tab2:
             st.success("Silindi!")
             st.rerun()
     else:
+
         st.info("Henüz kadrona şampiyon eklemedin.")
