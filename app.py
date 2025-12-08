@@ -162,18 +162,35 @@ with tab1:
                         # ChatGPT Bağlantısı
                         client = openai.OpenAI(api_key=openai_api_key)
                         prompt = f"""
-                        Marvel Şampiyonlar Turnuvası (MCOC) oyununda bir dövüş analizi yap.
-                        
-                        Saldıran (Ben): {secilen_saldiran}
-                        Savunan (Rakip): {secilen_rakip}
-                        
-                        Bu eşleşme için bana kısa ve net maddeler halinde taktik ver.
-                        1. Saldıranın hangi özelliği rakibi bozar?
-                        2. Rakibin hangi özelliğine dikkat etmeliyim?
-                        3. Hangi özel saldırıyı (L1/L2/L3) kullanmalıyım?
-                        4. Dövüşün püf noktası nedir?
-                        
-                        Cevabı Türkçe ver ve oyuncu diline (buff, debuff, dex, parry gibi terimlere) uygun olsun.
+                        Sen Marvel Şampiyonlar Turnuvası (MCOC) oyununun dünya çapındaki en iyi oyuncusu ve strateji uzmanısın.
+                        Oyunun tüm mekaniklerine (Buff, Debuff, Nodes, Ability Accuracy) hakimsin.
+
+                        ANALİZ EDİLECEK EŞLEŞME:
+                        🛡️ SAVUNAN (Rakip): {secilen_rakip}
+                        ⚔️ SALDIRAN (Ben): {secilen_saldiran}
+
+                        GÖREVİN:
+                        Bu iki karakterin karşılaşmasını kafanda simüle et ve bana teknik bir rehber hazırla. Cevabın şu 4 başlık altında detaylı olmalı:
+
+                        1. 🧠 MEKANİK ANALİZİ (Neden bu eşleşme?):
+                           - Saldıran karakterin hangi spesifik özelliği (Örn: Nötralize, Yakma, Zırh Kırma, Yavaşlatma) rakibin en tehlikeli özelliğini (Örn: Durdurulamaz, İyileşme, Kaçış) iptal eder? Mekaniği açıkla.
+
+                        2. 🥊 DÖVÜŞ ROTASYONU (Adım Adım):
+                           - Maça nasıl başlamalıyım?
+                           - Hangi komboyu yapmalıyım? (Örn: Orta-Hafif-Hafif-Hafif-Orta)
+                           - Saldıran karakterle hangi Özel Saldırıyı (L1/L2/L3) kullanmalıyım ve neden?
+
+                        3. ⚠️ KRİTİK UYARILAR (Yasaklar):
+                           - Rakip {secilen_rakip} ne yaparsa anında ölürüm?
+                           - Asla yapmamam gereken şey ne? (Örn: Blokuna vurma, sürekli siper atma, debuff atma vb.)
+
+                        4. 🏆 PÜF NOKTASI:
+                           - Bu dövüşü kolaylaştıracak "Pro" bir taktik ver.
+
+                        KURALLAR:
+                        - Asla "dikkatli ol", "iyi oyna" gibi genel laflar etme. Karakterlerin gerçek yetenek isimlerini kullan.
+                        - Oyuncu diline (Dex, Parry, Bait, Intercept, Buff, Power Gain) uygun konuş.
+                        - Cevabı Türkçe ver.
                         """
                         
                         response = client.chat.completions.create(
@@ -295,3 +312,4 @@ with tab2:
              st.rerun()
     else:
         st.info("Kadro boş veya yükleniyor...")
+
