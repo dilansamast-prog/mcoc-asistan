@@ -4,9 +4,11 @@ import extra_streamlit_components as stx
 import json
 import os
 import datetime
+import time
+import openai  # Yeni eklenen kütüphane
 
 # --- AYARLAR ---
-EXCEL_DOSYASI = "marvel_data.xlsx" # Dosya adının GitHub'dakiyle aynı olduğundan emin ol
+EXCEL_DOSYASI = "marvel_data.xlsx"
 SAYFA_ANA = "Marvel 2026"
 SAYFA_TAKTIK = "nasıl dövüşülür"
 
@@ -48,7 +50,6 @@ def excel_yukle():
         for _, row in df_main.iterrows():
             isim = str(row['İsim']).strip()
             db[isim] = row.to_dict()
-            # Varsayılanlar
             for key in ['SP Tercihi (Bait)', 'Kritik Uyarı (Yasaklar)', 'Nasıl Dövülür (Taktik)']:
                 db[isim][key] = "-"
 
@@ -59,39 +60,45 @@ def excel_yukle():
                     db[isim].update({
                         'SP Tercihi (Bait)': row.get('SP Tercihi (Bait)', '-'),
                         'Kritik Uyarı (Yasaklar)': row.get('Kritik Uyarı (Yasaklar)', '-'),
-                        'Nasıl Dövülür (Taktik)': row.get('Nasıl Dövülür (Taktik)', '-')
+                        'Nasıl Dövülür (Taktik)': row.get('Nasıl Dövülür (Taktik)', '-'),
+                        'En İyi 5 Anti (Counter)': row.get('En İyi 5 Anti (Counter)', '-')
                     })
+                    if 'En İyi 5 Anti (Counter)' in row and pd.notna(row['En İyi 5 Anti (Counter)']):
+                         db[isim]['En İyi 5 Anti (Counter)'] = row['En İyi 5 Anti (Counter)']
+
         return db
     except Exception as e:
         st.error(f"Excel Hatası: {e}")
         return None
 
-# --- ÇEREZ YÖNETİCİSİ AYARLARI ---
 def get_manager():
-    return stx.CookieManager()
+    return stx.CookieManager(key="mcoc_manager")
 
 cookie_manager = get_manager()
 
-# --- ARAYÜZ ---
+# --- ARAYÜZ BAŞLANGICI ---
+
+# Yan Menü (API Key Girişi)
+with st.sidebar:
+    st.header("⚙️ Ayarlar")
+    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password", help="ChatGPT özelliğini kullanmak için API anahtarınızı buraya girin.")
+    st.info("API Key'iniz tarayıcı oturumu boyunca saklanır, sunucuya kaydedilmez.")
 
 st.title("⚔️ MCoC Savaş Asistanı")
 
-# Çerezleri Oku
-cookies = cookie_manager.get_all()
-kadro_cookie = cookies.get("my_mcoc_squad")
-
-# Session State Başlatma (Çerez varsa oradan al, yoksa boş liste)
 if 'kadro' not in st.session_state:
-    if kadro_cookie:
-        try:
-            # Çerezler string (yazı) olarak saklanır, onu listeye çeviriyoruz
-            st.session_state['kadro'] = json.loads(kadro_cookie)
-        except:
-            st.session_state['kadro'] = []
-    else:
-        st.session_state['kadro'] = []
+    st.session_state['kadro'] = []
 
-# Excel Verisini Çek
+cookies = cookie_manager.get_all()
+
+if not st.session_state['kadro'] and cookies:
+    raw_cookie = cookies.get("my_mcoc_squad")
+    if raw_cookie:
+        try:
+            st.session_state['kadro'] = json.loads(raw_cookie)
+        except:
+            pass
+
 db = excel_yukle()
 if db is None:
     st.error(f"'{EXCEL_DOSYASI}' bulunamadı!")
@@ -99,18 +106,14 @@ if db is None:
 
 tum_isimler = sorted(list(db.keys()))
 
-# --- ÇEREZ KAYDETME FONKSİYONU ---
 def kadroyu_cereze_kaydet():
-    # Listeyi yazıya (JSON String) çevir
     kadro_str = json.dumps(st.session_state['kadro'], ensure_ascii=False)
-    # Çerezi güncelle (Süre: 30 Gün)
     expires = datetime.datetime.now() + datetime.timedelta(days=30)
     cookie_manager.set("my_mcoc_squad", kadro_str, expires_at=expires)
 
-# --- SEKMELER ---
-tab1, tab2 = st.tabs(["🔥 Savaş Analizi", "🛡️ Kadro Yönetimi"])
+tab1, tab2 = st.tabs(["🔥 Savaş Analizi & AI", "🛡️ Kadro Yönetimi"])
 
-# --- TAB 1: SAVAŞ ANALİZİ ---
+# --- TAB 1: SAVAŞ ANALİZİ VE AI ---
 with tab1:
     st.header("Rakip Analizi")
     secilen_rakip = st.selectbox("Rakip Şampiyonu Seçin:", tum_isimler, index=None, placeholder="Yazmaya başlayın...")
@@ -119,7 +122,8 @@ with tab1:
         rakip_data = db[secilen_rakip]
         r_sinif = rakip_data.get('Sınıf', 'Bilinmiyor')
         
-        with st.expander("📊 Rakip Detayları ve Taktikler (Tıkla)", expanded=True):
+        # --- EXCEL VERİLERİ ---
+        with st.expander("📊 Veritabanı Bilgileri (Tıkla)", expanded=True):
             col1, col2 = st.columns(2)
             with col1:
                 st.markdown(f"**Sınıf:** {r_sinif}")
@@ -128,14 +132,67 @@ with tab1:
                 st.markdown(f"**🎯 Bait:** {rakip_data.get('SP Tercihi (Bait)', '-')}")
             
             st.info(f"**🥊 Taktik:**\n{rakip_data.get('Nasıl Dövülür (Taktik)', '-')}")
-            
-            # --- YENİ EKLENEN KISIM ---
             st.success(f"**🛡️ En İyi 5 Anti (Genel Öneri):**\n{rakip_data.get('En İyi 5 Anti (Counter)', '-')}")
-            # --------------------------
 
         st.divider()
-        st.subheader("✅ Senin Kadron İçin Öneriler")
+        
+        # --- AI KOÇU BÖLÜMÜ ---
+        st.subheader("🧠 AI Koçuna Sor")
+        st.caption("Seçeceğin bir saldırı karakteri ile bu rakibi nasıl döveceğini ChatGPT'ye sor.")
 
+        # Kullanıcının kendi kadrosundan veya tüm listeden seçim yapması
+        secenekler = ["Tüm Liste"] + [h['isim'] for h in st.session_state['kadro']]
+        secim_kaynagi = st.radio("Saldıran Karakteri Nereden Seçeceksin?", ["Kadromdan", "Tüm Listeden"], horizontal=True)
+        
+        if secim_kaynagi == "Kadromdan":
+            saldıran_listesi = [h['isim'] for h in st.session_state['kadro']]
+        else:
+            saldıran_listesi = tum_isimler
+
+        secilen_saldiran = st.selectbox("Saldıran Karakteri Seç:", saldıran_listesi, index=None, placeholder="Kiminle saldıracaksın?")
+
+        if st.button("🤖 AI Analiz Başlat", type="primary"):
+            if not openai_api_key:
+                st.warning("Lütfen sol menüden OpenAI API Key giriniz.")
+            elif not secilen_saldiran:
+                st.warning("Lütfen bir saldıran karakter seçiniz.")
+            else:
+                with st.spinner("Yapay Zeka maçı analiz ediyor..."):
+                    try:
+                        # ChatGPT Bağlantısı
+                        client = openai.OpenAI(api_key=openai_api_key)
+                        prompt = f"""
+                        Marvel Şampiyonlar Turnuvası (MCOC) oyununda bir dövüş analizi yap.
+                        
+                        Saldıran (Ben): {secilen_saldiran}
+                        Savunan (Rakip): {secilen_rakip}
+                        
+                        Bu eşleşme için bana kısa ve net maddeler halinde taktik ver.
+                        1. Saldıranın hangi özelliği rakibi bozar?
+                        2. Rakibin hangi özelliğine dikkat etmeliyim?
+                        3. Hangi özel saldırıyı (L1/L2/L3) kullanmalıyım?
+                        4. Dövüşün püf noktası nedir?
+                        
+                        Cevabı Türkçe ver ve oyuncu diline (buff, debuff, dex, parry gibi terimlere) uygun olsun.
+                        """
+                        
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo", # Veya "gpt-4" kullanabilirsin
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        
+                        ai_cevabi = response.choices[0].message.content
+                        st.markdown("### 💡 AI Taktikleri:")
+                        st.markdown(ai_cevabi)
+                        
+                    except Exception as e:
+                        st.error(f"Bir hata oluştu: {e}")
+
+        st.divider()
+        st.subheader("✅ Senin Kadron İçin Excel Önerileri")
+        # ... (Eski kodun Kadro Hesaplama kısmı buraya gelecek) ...
+        # Kodun geri kalanını bozmamak için burayı aşağıya ekliyorum
+        
         if not st.session_state['kadro']:
             st.warning("Kadronuz boş! Lütfen 'Kadro Yönetimi' sekmesinden şampiyon ekleyin.")
         else:
@@ -148,7 +205,6 @@ with tab1:
                 h_isim = hero['isim']
                 h_sinif = hero['sinif']
                 
-                # Puanlama
                 if h_isim in antiler_text:
                     puan += 50
                     nedenler.append("⭐ TAM ANTİ")
@@ -186,7 +242,7 @@ with tab1:
 # --- TAB 2: KADRO YÖNETİMİ ---
 with tab2:
     st.header("Kadro Düzenle (Kişisel Kayıt)")
-    st.caption("⚠️ Veriler tarayıcınızın çerezlerinde 30 gün saklanır. Tarayıcı geçmişini silerseniz kaybolur.")
+    st.caption("Veriler tarayıcınızda saklanır. Sayfayı yenileseniz de silinmez.")
     
     col_k1, col_k2, col_k3 = st.columns(3)
     with col_k1:
@@ -205,11 +261,10 @@ with tab2:
                 sinif = db[yeni_isim].get('Sınıf', 'Bilinmiyor')
                 yeni_kayit = {"isim": yeni_isim, "yildiz": yeni_yildiz, "rank": yeni_rank, "sinif": sinif}
                 st.session_state['kadro'].append(yeni_kayit)
-                
-                # Çereze Kaydet
                 kadroyu_cereze_kaydet()
-                
-                st.toast(f"{yeni_isim} kaydedildi!", icon="✅")
+                st.toast(f"{yeni_isim} eklendi! Kaydediliyor...", icon="✅")
+                time.sleep(0.5)
+                st.rerun()
         else:
             st.toast("İsim seçmediniz.", icon="❌")
 
@@ -231,9 +286,12 @@ with tab2:
             st.session_state['kadro'] = [k for k in st.session_state['kadro'] 
                                          if not (k['isim'] == isim_sil and k['yildiz'] == yildiz_sil)]
             
-            # Güncel halini kaydet
             kadroyu_cereze_kaydet()
-            st.success("Silindi! Sayfa yenileniyor...")
+            st.success("Silindi!")
+            time.sleep(0.5)
             st.rerun()
+            
+        if st.button("🔄 Kadro Görünmüyorsa Tıkla (Yenile)"):
+             st.rerun()
     else:
-        st.info("Kadro boş.")
+        st.info("Kadro boş veya yükleniyor...")
